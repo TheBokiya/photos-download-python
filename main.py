@@ -1,15 +1,18 @@
 import requests
 import os
-import subprocess
-import urllib.request
 from bs4 import BeautifulSoup
 import tldextract
+import concurrent.futures
+import urllib.request
 
 web_pages = ['https://understandingdata.com/',
              'https://understandingdata.com/data-engineering-services/',
              'https://www.internetingishard.com/html-and-css/links-and-images/']
 
 url_dictionary = {}
+
+# path for saving the images
+directory = "images"
 
 for page in web_pages:
 
@@ -43,6 +46,27 @@ all_images = []
 cleaned_dictionary = {key: value for key,
                       value in url_dictionary.items() if len(value) > 0}
 
+# function to extract a single image
+
+
+def extract_single_image(img):
+    file_name = img.split('/')[-1]
+
+    # Let's try both of these versions in a loop [https:// and https://www.]
+    url_paths_to_try = [img, img.replace('https://', 'https://www.')]
+    for url_image_path in url_paths_to_try:
+        print(url_image_path)
+        try:
+            r = requests.get(img, stream=True)
+            if r.status_code == 200:
+                with open(file_name, 'wb') as f:
+                    for chunk in r:
+                        f.write(chunk)
+            return "Completed"
+        except Exception as e:
+            return "Failed"
+
+
 for key, images in cleaned_dictionary.items():
     # create a clean url and domain name for every page
     clean_urls = []
@@ -62,28 +86,26 @@ for key, images in cleaned_dictionary.items():
         else:
             all_images.append(source_image_url)
 
+# create a directory and change to that directory
+try:
+    os.mkdir(directory)
+except FileExistsError as e:
+    print("Directory already exists")
 
-def extract_images(image_urls_list: list, directory_path):
+os.chdir(f"{directory}")
 
-    # Changing directory into a specific folder:
-    os.chdir(directory_path)
+# run the job concurrently
+with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
+    future_to_url = {executor.submit(
+        extract_single_image, image_url) for image_url in all_images}
 
-    # Downloading all of the images
-    for img in image_urls_list:
-        file_name = img.split('/')[-1]
+    for future in concurrent.futures.as_completed(future_to_url):
+        try:
+            url = future_to_url[future]
+        except Exception as e:
+            pass
 
-        # Let's try both of these versions in a loop [https:// and https://www.]
-        url_paths_to_try = [img, img.replace('https://', 'https://www.')]
-        for url_image_path in url_paths_to_try:
-            print(url_image_path)
-            try:
-                r = requests.get(img, stream=True)
-                if r.status_code == 200:
-                    with open(file_name, 'wb') as f:
-                        for chunk in r:
-                            f.write(chunk)
-            except Exception as e:
-                pass
-
-
-extract_images(all_images, "./")
+        try:
+            data = future.result()
+        except Exception as exc:
+            print('%r generated an exception: %s' % (url, exc))
