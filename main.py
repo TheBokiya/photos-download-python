@@ -3,22 +3,26 @@ import os
 from bs4 import BeautifulSoup
 import tldextract
 import concurrent.futures
-import urllib.request
+import csv
 
-web_pages = ['https://understandingdata.com/',
-             'https://understandingdata.com/data-engineering-services/',
-             'https://www.internetingishard.com/html-and-css/links-and-images/']
 
+web_pages = []
 url_dictionary = {}
 
 # path for saving the images
 directory = "images"
 
+# read from a csv file and add each record to web_pages
+with open('source.csv', mode='r', encoding='utf-8-sig') as csvfile:
+    spamreader = csv.reader(csvfile, delimiter=' ', quotechar='|')
+    for row in spamreader:
+        print(row[0])
+        web_pages.append(row[0])
+
 for page in web_pages:
 
     # extract the domain name
     domain_name = tldextract.extract(page).registered_domain
-    print(f"The domain name: {domain_name}")
 
     # request the webpage
     r = requests.get(page)
@@ -55,7 +59,7 @@ def extract_single_image(img):
     # Let's try both of these versions in a loop [https:// and https://www.]
     url_paths_to_try = [img, img.replace('https://', 'https://www.')]
     for url_image_path in url_paths_to_try:
-        print(url_image_path)
+        print(f"getting image from :{url_image_path}")
         try:
             r = requests.get(img, stream=True)
             if r.status_code == 200:
@@ -74,6 +78,7 @@ for key, images in cleaned_dictionary.items():
 
     # loop every image per url
     for image in images:
+        print(image)
         # extract source
         source_image_url = image.attrs['src']
 
